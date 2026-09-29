@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ఇండియన్ స్వీట్స్ క్రష్ - పజిల్ గేమ్</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ff9933, #ffcc00);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: #333;
+        }
+        .game-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 {
+            color: #d35400;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            background: #fdf2e9;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
+            background: #d35400;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            touch-action: manipulation;
+        }
+        .cell {
+            aspect-ratio: 1;
+            background: #fff;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .cell:active {
+            transform: scale(0.9);
+        }
+        .cell.selected {
+            background: #f39c12;
+            transform: scale(1.05);
+        }
+        .btn {
+            background: #e67e22;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .btn:hover {
+            background: #d35400;
+        }
+        .modes {
+            margin-bottom: 15px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>🥮 ఇండియన్ స్వీట్స్ క్రష్</h1>
+    <p style="font-size: 13px; color: #666; margin-top:0;">ఒకే రకమైన 3 స్వీట్లను వరుసగా మార్చండి!</p>
+
+    <div class="modes">
+        <button class="btn" onclick="setMode('classic')" style="font-size:12px; padding:6px 10px;">క్లాసిక్ మోడ్</button>
+        <button class="btn" onclick="setMode('time')" style="font-size:12px; padding:6px 10px;">టైమ్ అటాక్</button>
+    </div>
+
+    <div class="stats">
+        <div>స్థాయి (Level): <span id="level">1</span></div>
+        <div>స్కోర్: <span id="score">0</span></div>
+        <div id="timer-box" style="display:none;">సమయం: <span id="timer">30</span>సె</div>
+    </div>
+
+    <div class="board" id="gameBoard"></div>
+
+    <button class="btn" onclick="spinWheel()">🎁 లక్కీ స్పిన్ బోనస్</button>
+</div>
+
+<!-- విన్ / ఓవర్ పాప్ అప్స్ -->
+<div class="modal" id="popupModal">
+    <div class="modal-content">
+        <h2 id="modalTitle">అద్భుతం!</h2>
+        <p id="modalText">మీరు ఈ స్థాయిని విజయవంతంగా దాటారు!</p>
+        <button class="btn" onclick="nextLevel()">తదుపరి స్థాయి</button>
+    </div>
+</div>
+
+<script>
+    const sweets = ['🥮', '🍬', '🍡', '🍥', '🍩']; // జలేబీ/లడ్డు తరహా ఎమోజీలు
+    const boardSize = 6;
+    let board = [];
+    let score = 0;
+    let level = 1;
+    let selectedCell = null;
+    let gameMode = 'classic';
+    let timerInterval = null;
+    let timeLeft = 30;
+
+    const boardElement = document.getElementById('gameBoard');
+    const scoreElement = document.getElementById('score');
+    const levelElement = document.getElementById('level');
+    const popupModal = document.getElementById('popupModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalText = document.getElementById('modalText');
+    const timerBox = document.getElementById('timer-box');
+    const timerElement = document.getElementById('timer');
+
+    function setMode(mode) {
+        gameMode = mode;
+        if(mode === 'time') {
+            timerBox.style.display = 'block';
+            startTimer();
+        } else {
+            timerBox.style.display = 'none';
+            clearInterval(timerInterval);
+        }
+        resetGame();
+    }
+
+    function startTimer() {
+        clearInterval(timerInterval);
+        timeLeft = 30;
+        timerElement.innerText = timeLeft;
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerElement.innerText = timeLeft;
+            if(timeLeft <= 0) {
+                clearInterval(timerInterval);
+                showModal("కాలం ముగిసింది!", "మీ స్కోర్: " + score);
+            }
+        }, 1000);
+    }
+
+    function initBoard() {
+        board = [];
+        boardElement.innerHTML = '';
+        for (let r = 0; r < boardSize; r++) {
+            let row = [];
+            for (let c = 0; c < boardSize; c++) {
+                let randomSweet = sweets[Math.floor(Math.random() * sweets.length)];
+                row.push(randomSweet);
+                
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.dataset.row = r;
+                cell.dataset.col = c;
+                cell.innerText = randomSweet;
+                cell.addEventListener('click', handleCellClick);
+                boardElement.appendChild(cell);
+            }
+            board.push(row);
+        }
+    }
+
+    function handleCellClick() {
+        const r = parseInt(this.dataset.row);
+        const c = parseInt(this.dataset.col);
+
+        if (!selectedCell) {
+            selectedCell = { r, c };
+            this.classList.add('selected');
+        } else {
+            const prevCell = document.querySelector(`[data-row='${selectedCell.r}'][data-col='${selectedCell.c}']`);
+            prevCell.classList.remove('selected');
+
+            // పక్కపక్కనే ఉన్నాయో లేదో చెక్ చేయండి
+            let diff = Math.abs(selectedCell.r - r) + Math.abs(selectedCell.c - c);
+            if (diff === 1) {
+                // స్వాప్ చేయండి
+                let temp = board[selectedCell.r][selectedCell.c];
+                board[selectedCell.r][selectedCell.c] = board[r][c];
+                board[r][c] = temp;
+
+                updateBoardUI();
+                checkMatches();
+            }
+            selectedCell = null;
+        }
+    }
+
+    function updateBoardUI() {
+        const cells = document.querySelectorAll('.cell');
+        cells.forEach(cell => {
+            let r = cell.dataset.row;
+            let c = cell.dataset.col;
+            cell.innerText = board[r][c];
+        });
+    }
+
+    function checkMatches() {
+        let matched = false;
+        // సింపుల్ స్కోరింగ్ అండ్ మ్యాచ్ చెకింగ్
+        for (let r = 0; r < boardSize; r++) {
+            for (let c = 0; c < boardSize - 2; c++) {
+                if (board[r][c] === board[r][c+1] && board[r][c] === board[r][c+2]) {
+                    matched = true;
+                }
+            }
+        }
+
+        if (matched) {
+            score += 50 * level;
+            scoreElement.innerText = score;
+            // కొత్త స్వీట్లను నింపడం
+            setTimeout(() => {
+                initBoard();
+                if(score >= level * 200) {
+                    showModal("అభినందనలు!", `మీరు స్థాయి ${level} విజయవంతంగా పూర్తిచేశారు!`);
+                }
+            }, 300);
+        }
+    }
+
+    function showModal(title, text) {
+        modalTitle.innerText = title;
+        modalText.innerText = text;
+        popupModal.style.display = 'flex';
+        clearInterval(timerInterval);
+    }
+
+    function nextLevel() {
+        level++;
+        levelElement.innerText = level;
+        score = 0;
+        scoreElement.innerText = score;
+        popupModal.style.display = 'none';
+        initBoard();
+        if(gameMode === 'time') startTimer();
+    }
+
+    function spinWheel() {
+        let bonus = Math.random() > 0.5 ? 100 : 200;
+        score += bonus;
+        scoreElement.innerText = score;
+        alert(` అదృష్టం బాగుంది! మీకు లక్కీ స్పిన్ ద్వారా +${bonus} బోనస్ పాయింట్లు వచ్చాయి!`);
+    }
+
+    // గేమ్ స్టార్ట్
+    initBoard();
+</script>
+
+</body>
+</html>
